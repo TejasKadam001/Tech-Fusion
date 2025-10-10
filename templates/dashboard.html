@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest/manifest.json') }}">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='imgs/logo.png') }}"
+    />
+    <title>Dashboard</title>
+    <!-- manifest is linked at top; served from static/manifest/manifest.json -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/lib/leaflet.css') }}"
+    />
+    <style>
+      @font-face {
+        font-family: "Heinch";
+        src: url("{{ url_for('static', filename='fonts/Heinch Medium.ttf') }}")
+          format("truetype");
+        font-weight: normal;
+        font-style: normal;
+      }
+      .font-heinch {
+        font-family: "Heinch", sans-serif;
+      }
+      body {
+        background: black;
+        color: #ffffff;
+        font-family: "Heinch", sans-serif;
+        margin: 0;
+      }
+      .logo {
+        padding: 1rem 1rem;
+      }
+      .logo img {
+        height: 105px;
+        width: auto;
+      }
+      #stars {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        background: transparent;
+        pointer-events: none;
+      }
+      .chart-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        padding: 20px;
+        max-width: 1280px;
+        margin: 20px auto;
+      }
+      .chart-box {
+        flex: 1 1 calc(33.333% - 20px);
+        max-width: calc(33.333% - 20px);
+        background: black;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 0 7px white;
+        min-width: 320px;
+        height: 250px;
+        box-sizing: border-box;
+      }
+      @media (max-width: 1024px) {
+        .chart-box {
+          flex: 1 1 calc(50% - 20px);
+          max-width: calc(50% - 20px);
+        }
+      }
+      @media (max-width: 768px) {
+        .chart-box {
+          flex: 1 1 calc(100% - 20px);
+          max-width: calc(100% - 20px);
+        }
+      }
+      .chute-status {
+        padding-top: 3rem;
+        font-size: 29px;
+        padding: 1rem;
+      }
+      h2 {
+        font-size: 29px;
+      }
+      #rocket-section {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 11rem;
+        flex-wrap: wrap;
+        margin: 60px 0;
+      }
+        /* Responsive rocket canvas: keeps square aspect and is transparent */
+        #rocket-canvas {
+          width: min(360px, 30vw);
+          aspect-ratio: 1 / 1;
+          background: transparent;
+          border-radius: 12px;
+          box-sizing: border-box;
+          display: block;
+      }
+      #map {
+        width: 300px;
+        height: 300px;
+        border-radius: 15px;
+        box-shadow: 0 0 5px white;
+      }
+      .head {
+        display: inline-block;
+        margin: 2rem 10.5rem;
+        padding-left: 1.1rem;
+        text-align: center;
+        letter-spacing: 1.5px;
+        font-size: 2rem;
+      }
+      .footer {
+        position: relative;
+        bottom: 0;
+        width: 100%;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 15px 0;
+        z-index: 100;
+      }
+      .footer-content {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 30px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 18px;
+      }
+      .data-label {
+        font-family: "Heinch", sans-serif;
+        font-size: 29px;
+      }
+      .footer a,
+      .footer span {
+        color: #fff;
+        text-decoration: none;
+      }
+      #battery-icon {
+        overflow: hidden;
+      }
+      #battery-fill {
+        transition: width 0.3s ease;
+      }
+      #notification-container {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        pointer-events: none;
+      }
+      .notification-popup {
+        background: linear-gradient(
+          to right,
+          rgba(50, 50, 50, 0.9),
+          rgba(20, 20, 20, 0.9)
+        );
+        color: white;
+        padding: 12px 25px;
+        border-radius: 20px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transform: translateY(-50px);
+        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        font-size: 1.1rem;
+        font-weight: bold;
+        text-align: center;
+        min-width: 250px;
+        max-width: 400px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: all;
+      }
+      .notification-popup.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .notification-popup.hide {
+        opacity: 0;
+        transform: translateY(-50px);
+      }
+      .notification-error {
+        background: linear-gradient(
+          to right,
+          rgba(220, 20, 60, 0.9),
+          rgba(178, 34, 34, 0.9)
+        );
+      }
+      .notification-connected {
+        background: linear-gradient(
+          to right,
+          rgba(139, 0, 139, 0.9),
+          rgba(75, 0, 130, 0.9)
+        );
+      }
+      .port-selection-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 8px 12px;
+        border-radius: 8px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        z-index: 10000;
+        border: 1px solid white;
+        font-family: "Heinch", sans-serif;
+      }
+      .port-selection-container select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background: transparent;
+        color: white;
+        border: none;
+        font-size: 1rem;
+        padding-right: 20px;
+        cursor: pointer;
+        background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3e%3cpolyline points="6 9 12 15 18 9"%3e%3c/polyline%3e%3c/svg%3e');
+        background-repeat: no-repeat;
+        background-position: right 5px center;
+        background-size: 15px;
+      }
+      .port-selection-container select:focus {
+        outline: none;
+      }
+      .port-selection-container select option,
+      .port-selection-container select optgroup {
+        background-color: black;
+        color: white;
+        font-family: "Heinch", sans-serif;
+      }
+      .stop-button-container {
+          position: absolute;
+          top: 69vh;
+          left: 46vw;
+          z-index: 10000;
+      }
+
+      .stop-button {
+          background: black;
+          color: white;
+          border: 2px solid white;
+          padding: 12px 24px;
+          border-radius: 25px;
+          cursor: pointer;
+          font-family: 'Heinch', sans-serif;
+          font-size: 1rem;
+          font-weight: bold;
+          transition: all 0.3s ease;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+      }
+
+      .stop-button:hover {
+          background: white;
+          color: black;
+          transform: translateY(-2px);
+      }
+
+    </style>
+  </head>
+  <body>
+    <canvas id="stars"></canvas>
+    <div class="logo">
+      <img src="{{ url_for('static', filename='imgs/logo.png') }}" alt="Logo" />
+    </div>
+    <div class="port-selection-container">
+      <select id="port-select">
+        <option disabled selected value="">Select Port</option>
+      </select>
+    </div>
+    <div class="stop-button-container">
+        <!-- MODIFIED BUTTON TEXT -->
+        <button class="stop-button" id="stop-flight-btn" onclick="startStarTracking()">
+          Star Tracking
+        </button>
+    </div>
+    
+    <div id="notification-container"></div>
+
+    <h2 class="head">Status</h2>
+    <h2 class="head">Orientation</h2>
+    <h2 class="head">Location</h2>
+    <div id="rocket-section">
+      <!-- MODIFIED STATUS SECTION -->
+      <div class="chute-status">
+        <p>
+          Speed :
+          <span id="speed-status">0.0 m/s</span>
+        </p>
+        <p>Reaction Wheel: <span id="reaction-wheel-status">Inactive</span></p>
+        <p>Magnetorquers : <span id="magnetorquer-status">Inactive</span></p>
+        <p>Lux: <span id="lux-status">0.0</span></p>
+        <p>Sun Up: <span id="sun-up-status">Unknown</span></p>
+        <p>
+          Lora Delay :
+          <span id="lora-delay">0.0 ms</span>
+        </p>
+      </div>
+
+      <div id="rocket-canvas"></div>
+
+      <div id="map"></div>
+    </div>
+
+    <div class="chart-container">
+      <h2 style="width: 100%; text-align: center; font-size: 2rem">
+        Satellite Telemetry
+      </h2>
+      <!-- MODIFIED CHART TITLES AND IDS -->
+      <div class="chart-box"><canvas id="quaternionChart"></canvas></div>
+      <div class="chart-box"><canvas id="altitudeChart"></canvas></div>
+      <div class="chart-box"><canvas id="temperatureChart"></canvas></div>
+      <div class="chart-box"><canvas id="accelXChart"></canvas></div>
+      <div class="chart-box"><canvas id="accelYChart"></canvas></div>
+      <div class="chart-box"><canvas id="accelZChart"></canvas></div>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-content">
+        <span>© lazy loopers</span>
+        <a href="#" target="_blank">
+          <img
+            src="{{ url_for('static', filename='imgs/insta.png') }}"
+            alt="Instagram"
+            class="social-icon"
+            style="height: 18px; width: 18px"
+          />
+        </a>
+      </div>
+    </footer>
+    <script src="{{ url_for('static', filename='js/lib/chart.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/socket.io.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/three.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/GLTFLoader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/luxon.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/chartjs-adapter-luxon.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/leaflet.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/gsap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='stars.js') }}"></script>
+    
+    <script>
+      const socket = io();
+      const maxDataPoints = 600;
+      let elapsedSeconds = 0;
+      const timeWindowSeconds = 100;
+      const notificationQueue = [];
+      let isNotificationShowing = false;
+      const portSelect = document.getElementById("port-select");
+
+      function updateStatusDisplayAnimated(elementId, newHtml) {
+        const element = document.getElementById(elementId);
+        if (element && element.innerHTML !== newHtml) {
+          gsap.to(element, {
+            duration: 0.2,
+            opacity: 0,
+            onComplete: () => {
+              element.innerHTML = newHtml;
+              gsap.to(element, {
+                duration: 0.2,
+                opacity: 1,
+              });
+            },
+          });
+        }
+      }
+
+      function addNotificationToQueue(message, type = "default") {
+        notificationQueue.push({ message, type });
+        if (!isNotificationShowing) {
+          processNotificationQueue();
+        }
+      }
+
+      function processNotificationQueue() {
+        if (notificationQueue.length > 0 && !isNotificationShowing) {
+          isNotificationShowing = true;
+          const { message, type } = notificationQueue.shift();
+          const container = document.getElementById("notification-container");
+          const popup = document.createElement("div");
+          popup.classList.add("notification-popup", `notification-${type}`);
+          popup.textContent = message;
+          container.appendChild(popup);
+          setTimeout(() => popup.classList.add("show"), 50);
+          setTimeout(() => {
+            popup.classList.remove("show");
+            popup.classList.add("hide");
+            popup.addEventListener("transitionend", () => popup.remove(), { once: true });
+            isNotificationShowing = false;
+            processNotificationQueue();
+          }, 4000);
+        }
+      }
+
+      function createChart(id, datasets) { // Modified to accept multiple datasets
+        const ctx = document.getElementById(id).getContext("2d");
+        return new Chart(ctx, {
+          type: "line",
+          data: { datasets: datasets.map(ds => ({ ...ds, data: [] })) },
+          options: {
+            animation: false, responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: "#fff", usePointStyle: true, pointStyle: "line", boxWidth: 20, font: { family: "Heinch" }}},
+              tooltip: { mode: "index", intersect: false, backgroundColor: "#222", titleColor: "#fff", bodyColor: "#eee" }
+            },
+            scales: {
+              x: { type: "linear", min: 0, max: timeWindowSeconds, ticks: { color: "#ccc" }, grid: { color: "#444" }},
+              y: { ticks: { color: "#ccc" }, grid: { color: "#444" }}
+            }
+          }
+        });
+      }
+      
+      // MODIFIED CHARTS SETUP
+      const charts = {
+        quaternion: createChart("quaternionChart", [
+            { label: "Q(w)", borderColor: "cyan" },
+            { label: "Q(x)", borderColor: "magenta" },
+            { label: "Q(y)", borderColor: "yellow" },
+            { label: "Q(z)", borderColor: "lime" },
+        ]),
+        altitude: createChart("altitudeChart", [{ label: "Altitude (m)", borderColor: "blue" }]),
+        temperature: createChart("temperatureChart",[{ label: "Temperature (°C)", borderColor: "orange" }]),
+        accel_x: createChart("accelXChart", [{ label: "Accel X (m/s²)", borderColor: "red" }]),
+        accel_y: createChart("accelYChart", [{ label: "Accel Y (m/s²)", borderColor: "green" }]),
+        accel_z: createChart("accelZChart", [{ label: "Accel Z (m/s²)", borderColor: "purple" }]),
+      };
+
+      function updateChart(chart, values) {
+        const valuesArray = Array.isArray(values) ? values : [values];
+        valuesArray.forEach((value, index) => {
+            if (chart.data.datasets[index]) {
+                chart.data.datasets[index].data.push({ x: elapsedSeconds, y: value });
+                if (chart.data.datasets[index].data.length > maxDataPoints) {
+                    chart.data.datasets[index].data.shift();
+                }
+            }
+        });
+        chart.options.scales.x.min = Math.max(0, elapsedSeconds - timeWindowSeconds);
+        chart.options.scales.x.max = elapsedSeconds;
+        chart.update("none");
+      }
+
+      let rocket, scene, camera, renderer;
+
+      // Camera control variables (inspired by model.py)
+  // Camera defaults tuned to keep model visible and centered
+  let camDistance = 6.0;
+  let camH = 0.0; // heading (degrees)
+  let camP = 10.0; // pitch (degrees)
+      let isPointerDown = false;
+      let lastPointerX = 0;
+      let lastPointerY = 0;
+      let simClock = 0;
+
+      function init3D() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        camera.position.z = camDistance;
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        // transparent background for renderer
+        renderer.setClearColor(0x000000, 0);
+        const canvasHolder = document.getElementById("rocket-canvas");
+        canvasHolder.appendChild(renderer.domElement);
+
+        // Resize renderer to match container
+        function resizeRenderer() {
+          const rect = canvasHolder.getBoundingClientRect();
+          const w = Math.max(64, Math.floor(rect.width));
+          const h = Math.max(64, Math.floor(rect.height));
+          renderer.setSize(w, h);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        }
+        window.addEventListener('resize', resizeRenderer);
+        // initial resize
+        resizeRenderer();
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7.5);
+        scene.add(dirLight);
+
+        // Load model
+        new THREE.GLTFLoader().load("{{ url_for('static', filename='models/satellite.glb') }}",
+          (gltf) => {
+            rocket = gltf.scene;
+            // Auto-scale model to fit the view and center it
+            try {
+              // compute bbox and current size
+              const box = new THREE.Box3().setFromObject(rocket);
+              const size = box.getSize(new THREE.Vector3());
+              const maxDim = Math.max(size.x, size.y, size.z);
+              // target world size for the model (meters in scene units)
+              const targetSize = 1.4; // increased slightly so model appears a bit larger
+              const scaleFactor = (maxDim > 0) ? (targetSize / maxDim) : 0.05;
+              rocket.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+              // re-center after scaling
+              const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scaleFactor);
+              rocket.position.sub(center);
+
+              // ensure camera distance frames the model comfortably
+              const newMaxDim = maxDim * scaleFactor;
+              camDistance = Math.max(camDistance, newMaxDim * 3.5);
+            } catch (e) {
+              // fallback
+              rocket.scale.set(0.02, 0.02, 0.02);
+              rocket.position.set(0,0,0);
+            }
+            scene.add(rocket);
+            // Subtle entry animation
+            gsap.from(rocket.position, { y: -2, duration: 1.5, ease: "elastic.out(1, 0.5)", delay: 0.2 });
+            // optional visual helper
+            try {
+              const box = new THREE.BoxHelper(rocket, 0xffffff);
+              box.material.opacity = 0.15;
+              box.material.transparent = true;
+              scene.add(box);
+            } catch (e) { /* ignore */ }
+          },
+          undefined,
+          (error) => console.error("Error loading satellite model:", error)
+        );
+
+        // Pointer controls for rotate
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+          isPointerDown = true;
+          lastPointerX = e.clientX;
+          lastPointerY = e.clientY;
+        });
+        window.addEventListener('pointerup', () => { isPointerDown = false; });
+        window.addEventListener('pointermove', (e) => {
+          if (!isPointerDown) return;
+          const dx = e.clientX - lastPointerX;
+          const dy = e.clientY - lastPointerY;
+          lastPointerX = e.clientX;
+          lastPointerY = e.clientY;
+          camH -= dx * 0.2;
+          camP += dy * 0.2;
+          camP = Math.max(-89, Math.min(89, camP));
+        });
+
+        // Wheel zoom
+        renderer.domElement.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const delta = Math.sign(e.deltaY) > 0 ? 1.1 : 0.9;
+          camDistance *= delta;
+          camDistance = Math.max(1.0, Math.min(50.0, camDistance));
+        }, { passive: false });
+
+        // Double click to reset
+        renderer.domElement.addEventListener('dblclick', () => {
+          camDistance = 6.0; camH = 0; camP = 10.0;
+        });
+
+        // Animation loop: update camera based on spherical coordinates and render
+        function animate() {
+          requestAnimationFrame(animate);
+          // update camera position relative to model (or origin)
+          const target = rocket ? rocket.position : new THREE.Vector3(0,0,0);
+          const hRad = THREE.MathUtils.degToRad(camH);
+          const pRad = THREE.MathUtils.degToRad(camP);
+          // Use Y as up convention (Three.js default) so the camera orbits above/below the model
+          const x = camDistance * Math.cos(pRad) * Math.sin(hRad);
+          const y = camDistance * Math.sin(pRad);
+          const z = camDistance * Math.cos(pRad) * Math.cos(hRad);
+          camera.position.set(target.x + x, target.y + y, target.z + z);
+          // ensure camera 'up' is Y axis
+          camera.up.set(0, 1, 0);
+          camera.lookAt(target);
+
+          // simple fallback simulated motion if no quaternion updates arrive
+          if (rocket && (!rocket.quaternion || rocket.quaternion.length() === 0)) {
+            simClock += 0.01;
+            rocket.rotation.y = Math.sin(simClock) * 0.5;
+          }
+
+          if (rocket) renderer.render(scene, camera);
+        }
+        animate();
+      }
+
+      L.Icon.Default.imagePath = "{{ url_for('static', filename='images/') }}";
+      let map = L.map("map").setView([18.5204, 73.8567], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+      let rocketMarker = L.marker([18.5204, 73.8567]).addTo(map);
+
+      async function getAndPopulatePorts() {
+        try {
+          const response = await fetch("/api/ports");
+          const data = await response.json();
+          portSelect.innerHTML = '<option disabled selected value="">Select Port</option>';
+          ['real', 'simulated'].forEach(groupName => {
+            if (data[groupName] && data[groupName].length > 0) {
+              const optgroup = document.createElement("optgroup");
+              optgroup.label = groupName.charAt(0).toUpperCase() + groupName.slice(1) + " Ports";
+              data[groupName].forEach(p => {
+                const option = document.createElement("option");
+                option.value = p.port;
+                option.textContent = p.description || p.port;
+                optgroup.appendChild(option);
+              });
+              portSelect.appendChild(optgroup);
+            }
+          });
+        } catch (error) {
+          console.error("Failed to fetch serial ports:", error);
+        }
+      }
+
+      portSelect.addEventListener("change", () => {
+        const selectedPort = portSelect.value;
+        if (selectedPort) {
+          const portDescription = portSelect.options[portSelect.selectedIndex].textContent;
+          socket.emit("set_port", { port: selectedPort });
+          addNotificationToQueue(`Connecting to ${portDescription}...`);
+        }
+      });
+      
+      socket.on("port_status", (data) => {
+        const portName = data.port.includes("SIMULATED") ? "Simulated Port" : data.port;
+        const message = data.error ? `Error: Could not connect to ${portName}.` : `Connected to ${portName}!`;
+        addNotificationToQueue(message, data.error ? "error" : "connected");
+      });
+
+      socket.on("sensor_data", (data) => {
+        elapsedSeconds++;
+        
+        // Update charts
+        updateChart(charts.quaternion, [data.qw, data.qx, data.qy, data.qz]);
+        updateChart(charts.altitude, data.altitude);
+        updateChart(charts.temperature, data.temperature);
+        updateChart(charts.accel_x, data.accel_x);
+        updateChart(charts.accel_y, data.accel_y);
+        updateChart(charts.accel_z, data.accel_z);
+
+        // Update status text
+        updateStatusDisplayAnimated("speed-status", `${data.speed.toFixed(2)} m/s`);
+        updateStatusDisplayAnimated("reaction-wheel-status", data.reaction_wheel);
+        updateStatusDisplayAnimated("magnetorquer-status", data.magnetorquer);
+        updateStatusDisplayAnimated("lux-status", data.lux.toFixed(1));
+        updateStatusDisplayAnimated("sun-up-status", data.sun_up);
+        updateStatusDisplayAnimated("lora-delay", `${data.lora_delay_ms.toFixed(1)} ms`);
+
+        // Update 3D model orientation
+        if (rocket && data.qx !== undefined) {
+          const rotationQuaternion = new THREE.Quaternion(data.qx, data.qy, data.qz, data.qw);
+          // This adjustment helps align the model's 'front' with the sensor's 'front'
+          const adjustRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+          rocket.quaternion.copy(adjustRotation).multiply(rotationQuaternion);
+        }
+
+        // Update map
+        if (data.lat && data.lon) {
+          let latLng = [data.lat, data.lon];
+          rocketMarker.setLatLng(latLng);
+          map.panTo(latLng);
+        }
+      });
+     
+      function stopFlight() {
+          addNotificationToQueue("Stopping data stream...", "connected");
+          const stopBtn = document.getElementById('stop-flight-btn');
+          stopBtn.disabled = true;
+          stopBtn.textContent = "STOPPED";
+          socket.emit('stop_flight', {});
+      }
+
+      // Start the external star tracker script on the server
+      // Assumes server listens for 'start_star_tracker' and spawns the script at given path
+      function startStarTracking() {
+        const btn = document.getElementById('stop-flight-btn');
+        // disable button immediately to avoid double clicks
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+
+        // Client no longer sends a script path; server runs analysis from its configured image
+        addNotificationToQueue('Requesting star tracker analysis...', 'connected');
+        socket.emit('start_star_tracking', {});
+      }
+
+      // Listen for server notifications and star tracking results
+      socket.on('notification', (payload) => {
+        if (payload && payload.message) addNotificationToQueue(payload.message, 'connected');
+      });
+
+      socket.on('star_tracking_result', (data) => {
+        const btn = document.getElementById('stop-flight-btn');
+        if (data && data.error) {
+          addNotificationToQueue('Star tracker error: ' + data.error, 'error');
+        } else {
+          const msg = data.message || 'Star analysis complete';
+          addNotificationToQueue(msg, 'connected');
+          // Optionally display patterns/attitude in console for now
+          console.log('Star tracking result:', data);
+        }
+        btn.textContent = 'Star Tracking';
+        btn.disabled = false;
+        btn.onclick = startStarTracking;
+      });
+
+      window.onload = () => {
+        init3D();
+        getAndPopulatePorts();
+      };
+
+    </script>
+  </body>
+</html>

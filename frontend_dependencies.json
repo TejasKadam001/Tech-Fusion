@@ -1,0 +1,51 @@
+{
+  "css_libs": [
+    {
+      "name": "leaflet.css",
+      "url": "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
+      "local_path": "static/css/lib/"
+    }
+  ],
+  "js_libs": [
+    {
+      "name": "chart.min.js",
+      "url": "https://cdn.jsdelivr.net/npm/chart.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "socket.io.min.js",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "three.min.js",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "GLTFLoader.js",
+      "url": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "luxon.min.js",
+      "url": "https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "chartjs-adapter-luxon.min.js",
+      "url": "https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "leaflet.js",
+      "url": "https://unpkg.com/leaflet@1.7.1/dist/leaflet.js",
+      "local_path": "static/js/lib/"
+    },
+    {
+      "name": "gsap.min.js",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js",
+      "local_path": "static/js/lib/"
+    }
+  ]
+}
