@@ -19,7 +19,6 @@ from scipy import ndimage
 # --- Configuration ---
 BAUD_RATE = 115200
 INDIAN_TIMEZONE = pytz.timezone('Asia/Kolkata')
-# IMPORTANT: Ensure you have a 'star_field.jpg' in the 'static/imgs/' directory
 STAR_IMAGE_PATH = os.path.join('static', 'imgs', 'star_field.jpg')
 
 # --- Global State Variables ---
@@ -74,9 +73,8 @@ class AccurateConstellationIdentifier:
     def identify_patterns(self, detected_stars, image_dimensions):
         if not detected_stars or len(detected_stars) < 3:
             return []
-        # This is a simplified placeholder for the complex geometric analysis.
         print("Star Tracker: Simulating geometric pattern analysis...")
-        time.sleep(3) # Simulate processing time
+        time.sleep(3)
         
         if len(detected_stars) > 4:
             print("Star Tracker: Found a pattern resembling Orion.")
@@ -203,7 +201,7 @@ def read_serial_real(port):
 
             dashboard_data = {
                 **real_data_state,
-                'speed': 0, # Placeholder
+                'speed': 0,
                 'reaction_wheel': "Active" if now < real_data_state.get('reaction_wheel_active_until', 0) else "Inactive",
                 'magnetorquer': "Active" if now < real_data_state.get('magnetorquer_active_until', 0) else "Inactive",
                 'lat': SIM_STATE['initial_lat'], 'lon': SIM_STATE['initial_lon'],
@@ -223,13 +221,11 @@ def read_serial_real(port):
 def read_serial_simulated(port):
     global thread_running
     while not thread_stop_event.is_set():
-        # Simulate gentle tumbling
         elapsed_time = time.time() - SIM_STATE.get('start_time', time.time())
         pitch = 30 * math.sin(elapsed_time * 0.1)
         roll = 20 * math.cos(elapsed_time * 0.07)
         yaw = 50 * math.sin(elapsed_time * 0.05)
         
-        # Convert Euler to Quaternion for 3D model
         cy, sy = math.cos(math.radians(yaw) * 0.5), math.sin(math.radians(yaw) * 0.5)
         cp, sp = math.cos(math.radians(pitch) * 0.5), math.sin(math.radians(pitch) * 0.5)
         cr, sr = math.cos(math.radians(roll) * 0.5), math.sin(math.radians(roll) * 0.5)
@@ -271,10 +267,12 @@ def start_serial_thread(port):
 
 # --- Flask & SocketIO Routes/Events ---
 @app.route('/')
-def index(): return render_template('index.html')
+def index(): 
+    return render_template('dashboard.html')
 
 @app.route('/dashboard')
-def dashboard(): return render_template('dashboard.html')
+def dashboard(): 
+    return render_template('dashboard.html')
 
 @app.route('/api/ports')
 def get_ports():
@@ -319,12 +317,10 @@ def _monitor_external_process(proc, sid):
     """Read subprocess stdout/stderr and emit notifications; emit final result when done."""
     try:
         socketio.emit('notification', {'message': 'External star tracker started.'}, room=sid)
-        # Stream stdout lines
         for line in proc.stdout:
             line = line.rstrip('\n')
             if line:
                 socketio.emit('notification', {'message': f'[external] {line}'}, room=sid)
-        # Capture remaining stderr
         stderr = proc.stderr.read()
         if stderr:
             socketio.emit('notification', {'message': f'[external-err] {stderr}'}, room=sid)
@@ -337,18 +333,15 @@ def _monitor_external_process(proc, sid):
         socketio.emit('star_tracking_result', {'error': str(e)}, room=sid)
     finally:
         try:
-            # cleanup
             external_processes.pop(sid, None)
         except Exception:
             pass
-
 
 @socketio.on('start_star_tracking')
 def handle_star_tracking(json):
     sid = request.sid if hasattr(request, 'sid') else None
     print(f"Received star tracking request from client. sid={sid}")
 
-    # Look for an external final8.py in likely locations
     candidates = [
         os.path.join(os.path.dirname(__file__), '..', 'final', 'final8.py'),
         os.path.join(os.path.dirname(__file__), '..', 'final8.py'),
@@ -364,7 +357,6 @@ def handle_star_tracking(json):
     if found:
         try:
             socketio.emit('notification', {'message': f'Launching external script {found}...'}, room=sid)
-            # Spawn the external script using the same python interpreter
             proc = subprocess.Popen([sys.executable, found], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             external_processes[sid] = proc
             monitor_thread = threading.Thread(target=_monitor_external_process, args=(proc, sid), daemon=True)
@@ -379,5 +371,4 @@ def handle_star_tracking(json):
     analysis_thread.start()
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5501, debug=False)
-
+    socketio.run(app, host='0.0.0.0', port=5508, debug=False)

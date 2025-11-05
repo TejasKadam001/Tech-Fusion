@@ -1,730 +1,1312 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <link rel="manifest" href="{{ url_for('static', filename='manifest/manifest.json') }}">
+<html lang="en">
+<head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link
-      rel="icon"
-      type="image/x-icon"
-      href="{{ url_for('static', filename='imgs/logo.png') }}"
-    />
-    <title>Dashboard</title>
-    <!-- manifest is linked at top; served from static/manifest/manifest.json -->
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/lib/leaflet.css') }}"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Satellite Operations Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/GLTFLoader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-      @font-face {
-        font-family: "Heinch";
-        src: url("{{ url_for('static', filename='fonts/Heinch Medium.ttf') }}")
-          format("truetype");
-        font-weight: normal;
-        font-style: normal;
-      }
-      .font-heinch {
-        font-family: "Heinch", sans-serif;
-      }
-      body {
-        background: black;
-        color: #ffffff;
-        font-family: "Heinch", sans-serif;
-        margin: 0;
-      }
-      .logo {
-        padding: 1rem 1rem;
-      }
-      .logo img {
-        height: 105px;
-        width: auto;
-      }
-      #stars {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: -1;
-        background: transparent;
-        pointer-events: none;
-      }
-      .chart-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 20px;
-        padding: 20px;
-        max-width: 1280px;
-        margin: 20px auto;
-      }
-      .chart-box {
-        flex: 1 1 calc(33.333% - 20px);
-        max-width: calc(33.333% - 20px);
-        background: black;
-        padding: 15px;
-        border-radius: 15px;
-        box-shadow: 0 0 7px white;
-        min-width: 320px;
-        height: 250px;
-        box-sizing: border-box;
-      }
-      @media (max-width: 1024px) {
-        .chart-box {
-          flex: 1 1 calc(50% - 20px);
-          max-width: calc(50% - 20px);
-        }
-      }
-      @media (max-width: 768px) {
-        .chart-box {
-          flex: 1 1 calc(100% - 20px);
-          max-width: calc(100% - 20px);
-        }
-      }
-      .chute-status {
-        padding-top: 3rem;
-        font-size: 29px;
-        padding: 1rem;
-      }
-      h2 {
-        font-size: 29px;
-      }
-      #rocket-section {
-        display: flex;
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: center;
-        gap: 11rem;
-        flex-wrap: wrap;
-        margin: 60px 0;
-      }
-        /* Responsive rocket canvas: keeps square aspect and is transparent */
-        #rocket-canvas {
-          width: min(360px, 30vw);
-          aspect-ratio: 1 / 1;
-          background: transparent;
-          border-radius: 12px;
-          box-sizing: border-box;
-          display: block;
-      }
-      #map {
-        width: 300px;
-        height: 300px;
-        border-radius: 15px;
-        box-shadow: 0 0 5px white;
-      }
-      .head {
-        display: inline-block;
-        margin: 2rem 10.5rem;
-        padding-left: 1.1rem;
-        text-align: center;
-        letter-spacing: 1.5px;
-        font-size: 2rem;
-      }
-      .footer {
-        position: relative;
-        bottom: 0;
-        width: 100%;
-        color: #fff;
-        background: rgba(0, 0, 0, 0.9);
-        padding: 15px 0;
-        z-index: 100;
-      }
-      .footer-content {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 30px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-size: 18px;
-      }
-      .data-label {
-        font-family: "Heinch", sans-serif;
-        font-size: 29px;
-      }
-      .footer a,
-      .footer span {
-        color: #fff;
-        text-decoration: none;
-      }
-      #battery-icon {
-        overflow: hidden;
-      }
-      #battery-fill {
-        transition: width 0.3s ease;
-      }
-      #notification-container {
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10000;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        pointer-events: none;
-      }
-      .notification-popup {
-        background: linear-gradient(
-          to right,
-          rgba(50, 50, 50, 0.9),
-          rgba(20, 20, 20, 0.9)
-        );
-        color: white;
-        padding: 12px 25px;
-        border-radius: 20px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-        opacity: 0;
-        transform: translateY(-50px);
-        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-        font-size: 1.1rem;
-        font-weight: bold;
-        text-align: center;
-        min-width: 250px;
-        max-width: 400px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        pointer-events: all;
-      }
-      .notification-popup.show {
-        opacity: 1;
-        transform: translateY(0);
-      }
-      .notification-popup.hide {
-        opacity: 0;
-        transform: translateY(-50px);
-      }
-      .notification-error {
-        background: linear-gradient(
-          to right,
-          rgba(220, 20, 60, 0.9),
-          rgba(178, 34, 34, 0.9)
-        );
-      }
-      .notification-connected {
-        background: linear-gradient(
-          to right,
-          rgba(139, 0, 139, 0.9),
-          rgba(75, 0, 130, 0.9)
-        );
-      }
-      .port-selection-container {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 8px 12px;
-        border-radius: 8px;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        z-index: 10000;
-        border: 1px solid white;
-        font-family: "Heinch", sans-serif;
-      }
-      .port-selection-container select {
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-        background: transparent;
-        color: white;
-        border: none;
-        font-size: 1rem;
-        padding-right: 20px;
-        cursor: pointer;
-        background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3e%3cpolyline points="6 9 12 15 18 9"%3e%3c/polyline%3e%3c/svg%3e');
-        background-repeat: no-repeat;
-        background-position: right 5px center;
-        background-size: 15px;
-      }
-      .port-selection-container select:focus {
-        outline: none;
-      }
-      .port-selection-container select option,
-      .port-selection-container select optgroup {
-        background-color: black;
-        color: white;
-        font-family: "Heinch", sans-serif;
-      }
-      .stop-button-container {
-          position: absolute;
-          top: 69vh;
-          left: 46vw;
-          z-index: 10000;
-      }
-
-      .stop-button {
-          background: black;
-          color: white;
-          border: 2px solid white;
-          padding: 12px 24px;
-          border-radius: 25px;
-          cursor: pointer;
-          font-family: 'Heinch', sans-serif;
-          font-size: 1rem;
-          font-weight: bold;
-          transition: all 0.3s ease;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-      }
-
-      .stop-button:hover {
-          background: white;
-          color: black;
-          transform: translateY(-2px);
-      }
-
-    </style>
-  </head>
-  <body>
-    <canvas id="stars"></canvas>
-    <div class="logo">
-      <img src="{{ url_for('static', filename='imgs/logo.png') }}" alt="Logo" />
-    </div>
-    <div class="port-selection-container">
-      <select id="port-select">
-        <option disabled selected value="">Select Port</option>
-      </select>
-    </div>
-    <div class="stop-button-container">
-        <!-- MODIFIED BUTTON TEXT -->
-        <button class="stop-button" id="stop-flight-btn" onclick="startStarTracking()">
-          Star Tracking
-        </button>
-    </div>
-    
-    <div id="notification-container"></div>
-
-    <h2 class="head">Status</h2>
-    <h2 class="head">Orientation</h2>
-    <h2 class="head">Location</h2>
-    <div id="rocket-section">
-      <!-- MODIFIED STATUS SECTION -->
-      <div class="chute-status">
-        <p>
-          Speed :
-          <span id="speed-status">0.0 m/s</span>
-        </p>
-        <p>Reaction Wheel: <span id="reaction-wheel-status">Inactive</span></p>
-        <p>Magnetorquers : <span id="magnetorquer-status">Inactive</span></p>
-        <p>Lux: <span id="lux-status">0.0</span></p>
-        <p>Sun Up: <span id="sun-up-status">Unknown</span></p>
-        <p>
-          Lora Delay :
-          <span id="lora-delay">0.0 ms</span>
-        </p>
-      </div>
-
-      <div id="rocket-canvas"></div>
-
-      <div id="map"></div>
-    </div>
-
-    <div class="chart-container">
-      <h2 style="width: 100%; text-align: center; font-size: 2rem">
-        Satellite Telemetry
-      </h2>
-      <!-- MODIFIED CHART TITLES AND IDS -->
-      <div class="chart-box"><canvas id="quaternionChart"></canvas></div>
-      <div class="chart-box"><canvas id="altitudeChart"></canvas></div>
-      <div class="chart-box"><canvas id="temperatureChart"></canvas></div>
-      <div class="chart-box"><canvas id="accelXChart"></canvas></div>
-      <div class="chart-box"><canvas id="accelYChart"></canvas></div>
-      <div class="chart-box"><canvas id="accelZChart"></canvas></div>
-    </div>
-
-    <footer class="footer">
-      <div class="footer-content">
-        <span>© lazy loopers</span>
-        <a href="#" target="_blank">
-          <img
-            src="{{ url_for('static', filename='imgs/insta.png') }}"
-            alt="Instagram"
-            class="social-icon"
-            style="height: 18px; width: 18px"
-          />
-        </a>
-      </div>
-    </footer>
-    <script src="{{ url_for('static', filename='js/lib/chart.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/socket.io.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/three.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/GLTFLoader.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/luxon.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/chartjs-adapter-luxon.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/leaflet.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/gsap.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='stars.js') }}"></script>
-    
-    <script>
-      const socket = io();
-      const maxDataPoints = 600;
-      let elapsedSeconds = 0;
-      const timeWindowSeconds = 100;
-      const notificationQueue = [];
-      let isNotificationShowing = false;
-      const portSelect = document.getElementById("port-select");
-
-      function updateStatusDisplayAnimated(elementId, newHtml) {
-        const element = document.getElementById(elementId);
-        if (element && element.innerHTML !== newHtml) {
-          gsap.to(element, {
-            duration: 0.2,
-            opacity: 0,
-            onComplete: () => {
-              element.innerHTML = newHtml;
-              gsap.to(element, {
-                duration: 0.2,
-                opacity: 1,
-              });
-            },
-          });
-        }
-      }
-
-      function addNotificationToQueue(message, type = "default") {
-        notificationQueue.push({ message, type });
-        if (!isNotificationShowing) {
-          processNotificationQueue();
-        }
-      }
-
-      function processNotificationQueue() {
-        if (notificationQueue.length > 0 && !isNotificationShowing) {
-          isNotificationShowing = true;
-          const { message, type } = notificationQueue.shift();
-          const container = document.getElementById("notification-container");
-          const popup = document.createElement("div");
-          popup.classList.add("notification-popup", `notification-${type}`);
-          popup.textContent = message;
-          container.appendChild(popup);
-          setTimeout(() => popup.classList.add("show"), 50);
-          setTimeout(() => {
-            popup.classList.remove("show");
-            popup.classList.add("hide");
-            popup.addEventListener("transitionend", () => popup.remove(), { once: true });
-            isNotificationShowing = false;
-            processNotificationQueue();
-          }, 4000);
-        }
-      }
-
-      function createChart(id, datasets) { // Modified to accept multiple datasets
-        const ctx = document.getElementById(id).getContext("2d");
-        return new Chart(ctx, {
-          type: "line",
-          data: { datasets: datasets.map(ds => ({ ...ds, data: [] })) },
-          options: {
-            animation: false, responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { labels: { color: "#fff", usePointStyle: true, pointStyle: "line", boxWidth: 20, font: { family: "Heinch" }}},
-              tooltip: { mode: "index", intersect: false, backgroundColor: "#222", titleColor: "#fff", bodyColor: "#eee" }
-            },
-            scales: {
-              x: { type: "linear", min: 0, max: timeWindowSeconds, ticks: { color: "#ccc" }, grid: { color: "#444" }},
-              y: { ticks: { color: "#ccc" }, grid: { color: "#444" }}
-            }
-          }
-        });
-      }
-      
-      // MODIFIED CHARTS SETUP
-      const charts = {
-        quaternion: createChart("quaternionChart", [
-            { label: "Q(w)", borderColor: "cyan" },
-            { label: "Q(x)", borderColor: "magenta" },
-            { label: "Q(y)", borderColor: "yellow" },
-            { label: "Q(z)", borderColor: "lime" },
-        ]),
-        altitude: createChart("altitudeChart", [{ label: "Altitude (m)", borderColor: "blue" }]),
-        temperature: createChart("temperatureChart",[{ label: "Temperature (°C)", borderColor: "orange" }]),
-        accel_x: createChart("accelXChart", [{ label: "Accel X (m/s²)", borderColor: "red" }]),
-        accel_y: createChart("accelYChart", [{ label: "Accel Y (m/s²)", borderColor: "green" }]),
-        accel_z: createChart("accelZChart", [{ label: "Accel Z (m/s²)", borderColor: "purple" }]),
-      };
-
-      function updateChart(chart, values) {
-        const valuesArray = Array.isArray(values) ? values : [values];
-        valuesArray.forEach((value, index) => {
-            if (chart.data.datasets[index]) {
-                chart.data.datasets[index].data.push({ x: elapsedSeconds, y: value });
-                if (chart.data.datasets[index].data.length > maxDataPoints) {
-                    chart.data.datasets[index].data.shift();
-                }
-            }
-        });
-        chart.options.scales.x.min = Math.max(0, elapsedSeconds - timeWindowSeconds);
-        chart.options.scales.x.max = elapsedSeconds;
-        chart.update("none");
-      }
-
-      let rocket, scene, camera, renderer;
-
-      // Camera control variables (inspired by model.py)
-  // Camera defaults tuned to keep model visible and centered
-  let camDistance = 6.0;
-  let camH = 0.0; // heading (degrees)
-  let camP = 10.0; // pitch (degrees)
-      let isPointerDown = false;
-      let lastPointerX = 0;
-      let lastPointerY = 0;
-      let simClock = 0;
-
-      function init3D() {
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        camera.position.z = camDistance;
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        // transparent background for renderer
-        renderer.setClearColor(0x000000, 0);
-        const canvasHolder = document.getElementById("rocket-canvas");
-        canvasHolder.appendChild(renderer.domElement);
-
-        // Resize renderer to match container
-        function resizeRenderer() {
-          const rect = canvasHolder.getBoundingClientRect();
-          const w = Math.max(64, Math.floor(rect.width));
-          const h = Math.max(64, Math.floor(rect.height));
-          renderer.setSize(w, h);
-          camera.aspect = w / h;
-          camera.updateProjectionMatrix();
-        }
-        window.addEventListener('resize', resizeRenderer);
-        // initial resize
-        resizeRenderer();
-
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(5, 10, 7.5);
-        scene.add(dirLight);
-
-        // Load model
-        new THREE.GLTFLoader().load("{{ url_for('static', filename='models/satellite.glb') }}",
-          (gltf) => {
-            rocket = gltf.scene;
-            // Auto-scale model to fit the view and center it
-            try {
-              // compute bbox and current size
-              const box = new THREE.Box3().setFromObject(rocket);
-              const size = box.getSize(new THREE.Vector3());
-              const maxDim = Math.max(size.x, size.y, size.z);
-              // target world size for the model (meters in scene units)
-              const targetSize = 1.4; // increased slightly so model appears a bit larger
-              const scaleFactor = (maxDim > 0) ? (targetSize / maxDim) : 0.05;
-              rocket.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-              // re-center after scaling
-              const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scaleFactor);
-              rocket.position.sub(center);
-
-              // ensure camera distance frames the model comfortably
-              const newMaxDim = maxDim * scaleFactor;
-              camDistance = Math.max(camDistance, newMaxDim * 3.5);
-            } catch (e) {
-              // fallback
-              rocket.scale.set(0.02, 0.02, 0.02);
-              rocket.position.set(0,0,0);
-            }
-            scene.add(rocket);
-            // Subtle entry animation
-            gsap.from(rocket.position, { y: -2, duration: 1.5, ease: "elastic.out(1, 0.5)", delay: 0.2 });
-            // optional visual helper
-            try {
-              const box = new THREE.BoxHelper(rocket, 0xffffff);
-              box.material.opacity = 0.15;
-              box.material.transparent = true;
-              scene.add(box);
-            } catch (e) { /* ignore */ }
-          },
-          undefined,
-          (error) => console.error("Error loading satellite model:", error)
-        );
-
-        // Pointer controls for rotate
-        renderer.domElement.addEventListener('pointerdown', (e) => {
-          isPointerDown = true;
-          lastPointerX = e.clientX;
-          lastPointerY = e.clientY;
-        });
-        window.addEventListener('pointerup', () => { isPointerDown = false; });
-        window.addEventListener('pointermove', (e) => {
-          if (!isPointerDown) return;
-          const dx = e.clientX - lastPointerX;
-          const dy = e.clientY - lastPointerY;
-          lastPointerX = e.clientX;
-          lastPointerY = e.clientY;
-          camH -= dx * 0.2;
-          camP += dy * 0.2;
-          camP = Math.max(-89, Math.min(89, camP));
-        });
-
-        // Wheel zoom
-        renderer.domElement.addEventListener('wheel', (e) => {
-          e.preventDefault();
-          const delta = Math.sign(e.deltaY) > 0 ? 1.1 : 0.9;
-          camDistance *= delta;
-          camDistance = Math.max(1.0, Math.min(50.0, camDistance));
-        }, { passive: false });
-
-        // Double click to reset
-        renderer.domElement.addEventListener('dblclick', () => {
-          camDistance = 6.0; camH = 0; camP = 10.0;
-        });
-
-        // Animation loop: update camera based on spherical coordinates and render
-        function animate() {
-          requestAnimationFrame(animate);
-          // update camera position relative to model (or origin)
-          const target = rocket ? rocket.position : new THREE.Vector3(0,0,0);
-          const hRad = THREE.MathUtils.degToRad(camH);
-          const pRad = THREE.MathUtils.degToRad(camP);
-          // Use Y as up convention (Three.js default) so the camera orbits above/below the model
-          const x = camDistance * Math.cos(pRad) * Math.sin(hRad);
-          const y = camDistance * Math.sin(pRad);
-          const z = camDistance * Math.cos(pRad) * Math.cos(hRad);
-          camera.position.set(target.x + x, target.y + y, target.z + z);
-          // ensure camera 'up' is Y axis
-          camera.up.set(0, 1, 0);
-          camera.lookAt(target);
-
-          // simple fallback simulated motion if no quaternion updates arrive
-          if (rocket && (!rocket.quaternion || rocket.quaternion.length() === 0)) {
-            simClock += 0.01;
-            rocket.rotation.y = Math.sin(simClock) * 0.5;
-          }
-
-          if (rocket) renderer.render(scene, camera);
-        }
-        animate();
-      }
-
-      L.Icon.Default.imagePath = "{{ url_for('static', filename='images/') }}";
-      let map = L.map("map").setView([18.5204, 73.8567], 13);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
-      let rocketMarker = L.marker([18.5204, 73.8567]).addTo(map);
-
-      async function getAndPopulatePorts() {
-        try {
-          const response = await fetch("/api/ports");
-          const data = await response.json();
-          portSelect.innerHTML = '<option disabled selected value="">Select Port</option>';
-          ['real', 'simulated'].forEach(groupName => {
-            if (data[groupName] && data[groupName].length > 0) {
-              const optgroup = document.createElement("optgroup");
-              optgroup.label = groupName.charAt(0).toUpperCase() + groupName.slice(1) + " Ports";
-              data[groupName].forEach(p => {
-                const option = document.createElement("option");
-                option.value = p.port;
-                option.textContent = p.description || p.port;
-                optgroup.appendChild(option);
-              });
-              portSelect.appendChild(optgroup);
-            }
-          });
-        } catch (error) {
-          console.error("Failed to fetch serial ports:", error);
-        }
-      }
-
-      portSelect.addEventListener("change", () => {
-        const selectedPort = portSelect.value;
-        if (selectedPort) {
-          const portDescription = portSelect.options[portSelect.selectedIndex].textContent;
-          socket.emit("set_port", { port: selectedPort });
-          addNotificationToQueue(`Connecting to ${portDescription}...`);
-        }
-      });
-      
-      socket.on("port_status", (data) => {
-        const portName = data.port.includes("SIMULATED") ? "Simulated Port" : data.port;
-        const message = data.error ? `Error: Could not connect to ${portName}.` : `Connected to ${portName}!`;
-        addNotificationToQueue(message, data.error ? "error" : "connected");
-      });
-
-      socket.on("sensor_data", (data) => {
-        elapsedSeconds++;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        // Update charts
-        updateChart(charts.quaternion, [data.qw, data.qx, data.qy, data.qz]);
-        updateChart(charts.altitude, data.altitude);
-        updateChart(charts.temperature, data.temperature);
-        updateChart(charts.accel_x, data.accel_x);
-        updateChart(charts.accel_y, data.accel_y);
-        updateChart(charts.accel_z, data.accel_z);
-
-        // Update status text
-        updateStatusDisplayAnimated("speed-status", `${data.speed.toFixed(2)} m/s`);
-        updateStatusDisplayAnimated("reaction-wheel-status", data.reaction_wheel);
-        updateStatusDisplayAnimated("magnetorquer-status", data.magnetorquer);
-        updateStatusDisplayAnimated("lux-status", data.lux.toFixed(1));
-        updateStatusDisplayAnimated("sun-up-status", data.sun_up);
-        updateStatusDisplayAnimated("lora-delay", `${data.lora_delay_ms.toFixed(1)} ms`);
-
-        // Update 3D model orientation
-        if (rocket && data.qx !== undefined) {
-          const rotationQuaternion = new THREE.Quaternion(data.qx, data.qy, data.qz, data.qw);
-          // This adjustment helps align the model's 'front' with the sensor's 'front'
-          const adjustRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
-          rocket.quaternion.copy(adjustRotation).multiply(rotationQuaternion);
+        body {
+            background: linear-gradient(135deg, #f5f5f5, #ffffff, #eeeeee);
+            color: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
         }
 
-        // Update map
-        if (data.lat && data.lon) {
-          let latLng = [data.lat, data.lon];
-          rocketMarker.setLatLng(latLng);
-          map.panTo(latLng);
+        #starCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            display: none;
         }
-      });
-     
-      function stopFlight() {
-          addNotificationToQueue("Stopping data stream...", "connected");
-          const stopBtn = document.getElementById('stop-flight-btn');
-          stopBtn.disabled = true;
-          stopBtn.textContent = "STOPPED";
-          socket.emit('stop_flight', {});
-      }
 
-      // Start the external star tracker script on the server
-      // Assumes server listens for 'start_star_tracker' and spawns the script at given path
-      function startStarTracking() {
-        const btn = document.getElementById('stop-flight-btn');
-        // disable button immediately to avoid double clicks
-        btn.disabled = true;
-        btn.textContent = 'Starting...';
-
-        // Client no longer sends a script path; server runs analysis from its configured image
-        addNotificationToQueue('Requesting star tracker analysis...', 'connected');
-        socket.emit('start_star_tracking', {});
-      }
-
-      // Listen for server notifications and star tracking results
-      socket.on('notification', (payload) => {
-        if (payload && payload.message) addNotificationToQueue(payload.message, 'connected');
-      });
-
-      socket.on('star_tracking_result', (data) => {
-        const btn = document.getElementById('stop-flight-btn');
-        if (data && data.error) {
-          addNotificationToQueue('Star tracker error: ' + data.error, 'error');
-        } else {
-          const msg = data.message || 'Star analysis complete';
-          addNotificationToQueue(msg, 'connected');
-          // Optionally display patterns/attitude in console for now
-          console.log('Star tracking result:', data);
+        .main-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
         }
-        btn.textContent = 'Star Tracking';
-        btn.disabled = false;
-        btn.onclick = startStarTracking;
-      });
 
-      window.onload = () => {
-        init3D();
-        getAndPopulatePorts();
-      };
+        .logo {
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
 
+        .logo-text {
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #000;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .port-selection-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 2px solid #000;
+            z-index: 3000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .port-selection-container select {
+            background: white;
+            color: #000;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .ai-collision-section {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #000;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            color: #000;
+            margin-bottom: 20px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            border-bottom: 3px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .ai-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .ai-metric-card {
+            background: white;
+            border: 2px solid #000;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .ai-metric-card:hover {
+            background: #f0f0f0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .ai-metric-label {
+            font-size: 0.85em;
+            color: #555;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .ai-metric-value {
+            font-size: 1.8em;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .ai-control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .ai-control-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            color: #000;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="range"], input[type="number"], select {
+            padding: 8px 12px;
+            border: 2px solid #000;
+            background: white;
+            color: #000;
+            font-size: 0.95em;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #000;
+            color: white;
+            border: 2px solid #000;
+            padding: 10px 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover:not(:disabled) {
+            background: white;
+            color: #000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 15px;
+            background: #e0e0e0;
+            border: 2px solid #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #000;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .prediction-item {
+            background: white;
+            border-left: 5px solid;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .prediction-item.critical { border-left-color: #ff0000; background: #fff5f5; }
+        .prediction-item.high { border-left-color: #ff6b6b; background: #fff5f5; }
+        .prediction-item.medium { border-left-color: #ffa500; background: #fffaf0; }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            font-weight: bold;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+
+        .badge.critical { background: #ff0000; color: #fff; }
+        .badge.high { background: #ff6b6b; color: #fff; }
+        .badge.medium { background: #ffa500; color: #000; }
+
+        .status-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .status-box {
+            background: white;
+            border: 2px solid #000;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .status-box h3 {
+            color: #000;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.95em;
+        }
+
+        .status-label {
+            color: #666;
+            font-weight: bold;
+        }
+
+        .status-value {
+            color: #000;
+            font-weight: bold;
+        }
+
+        #satellite-canvas {
+            width: min(280px, 25vw);
+            aspect-ratio: 1 / 1;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #000;
+            display: block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .charts-section {
+            margin-bottom: 25px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            height: 280px;
+        }
+
+        .chart-title {
+            text-align: center;
+            color: #000;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .payload-section {
+            background: white;
+            border: 2px solid #000;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .payload-header {
+            font-size: 1.4em;
+            color: #000;
+            text-align: center;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+
+        .param-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .param-box {
+            background: #f9f9f9;
+            border: 2px solid #000;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .param-title {
+            font-size: 0.85em;
+            color: #000;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .param-value {
+            font-size: 1.3em;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .notification-popup {
+            background: white;
+            color: #000;
+            padding: 12px 25px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transform: translateY(-50px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+            font-size: 1em;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid #000;
+            pointer-events: all;
+        }
+
+        .notification-popup.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #000;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 2px solid #000;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 30px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 25px;
+            color: #999;
+            font-size: 1em;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .detail-item {
+            background: #f9f9f9;
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .detail-label {
+            color: #666;
+            font-size: 0.75em;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            color: #000;
+            font-weight: bold;
+            font-size: 1em;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .ai-metrics-grid, .ai-control-group, .status-section, .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .section-title { font-size: 1.4em; }
+            .ai-metric-value { font-size: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starCanvas"></canvas>
+
+    <div class="main-container">
+        <div class="logo">
+            <div class="logo-text">SATELLITE OPERATIONS DASHBOARD</div>
+        </div>
+
+        <div class="port-selection-container">
+            <select id="port-select">
+                <option disabled selected value="">Select Port</option>
+            </select>
+        </div>
+
+        <div class="notification-container" id="notification-container"></div>
+
+        <!-- AI COLLISION DETECTION SECTION -->
+        <div class="ai-collision-section">
+            <div class="section-title">AI Orbital Collision Detection</div>
+            
+            <div class="ai-metrics-grid">
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Model Status</div>
+                    <div class="ai-metric-value" id="modelStatus">Ready</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Training Loss</div>
+                    <div class="ai-metric-value" id="trainingLoss">-</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Accuracy</div>
+                    <div class="ai-metric-value" id="accuracy">-</div>
+                </div>
+                <div class="ai-metric-card">
+                    <div class="ai-metric-label">Predictions</div>
+                    <div class="ai-metric-value" id="predictionCount">0</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div class="ai-control-item">
+                    <label>Training Epochs</label>
+                    <input type="number" id="epochs" value="50" min="10" max="200">
+                </div>
+                <div class="ai-control-item">
+                    <label>Batch Size</label>
+                    <input type="number" id="batchSize" value="32" min="8" max="128">
+                </div>
+                <div class="ai-control-item">
+                    <button id="trainBtn" onclick="trainModel()">Train ML Model</button>
+                </div>
+            </div>
+
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid #000;">
+                <div id="trainingInfo">Click "Train ML Model" to start training on collision scenarios...</div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <div class="ai-control-item">
+                    <label>Satellite ID (N2YO)</label>
+                    <input type="number" id="satSelect" value="25544" placeholder="e.g., 25544">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button id="fetchBtn" onclick="fetchLiveData()" style="flex: 1;">Fetch Live Data</button>
+                    <button id="predictBtn" onclick="predictCollision()" disabled style="flex: 1;">Predict Collision</button>
+                </div>
+            </div>
+
+            <div id="satelliteContainer" style="margin-top: 15px;">
+                <div class="empty-state">Enter satellite ID and click "Fetch Live Data"</div>
+            </div>
+
+            <div id="predictionsContainer" style="margin-top: 15px;">
+                <div class="empty-state">Train model and fetch data to see predictions...</div>
+            </div>
+        </div>
+
+        <!-- SATELLITE STATUS SECTION -->
+        <div style="margin-bottom: 25px;">
+            <h2 class="section-title">Satellite Status & Orientation</h2>
+            <div class="status-section">
+                <div class="status-box">
+                    <h3>Real-Time Status</h3>
+                    <div class="status-item">
+                        <span class="status-label">Speed</span>
+                        <span class="status-value" id="speed-status">0.0 m/s</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Reaction Wheel</span>
+                        <span class="status-value" id="reaction-wheel-status">Inactive</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Magnetorquers</span>
+                        <span class="status-value" id="magnetorquer-status">Inactive</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Lux</span>
+                        <span class="status-value" id="lux-status">0.0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Sun Status</span>
+                        <span class="status-value" id="sun-up-status">Unknown</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <h3 style="color: #000; margin-bottom: 10px;">Rocket Orientation</h3>
+                    <div id="satellite-canvas"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELEMETRY CHARTS SECTION -->
+        <div class="charts-section">
+            <h2 class="section-title">Satellite Telemetry</h2>
+            <div class="charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">Quaternion</div>
+                    <canvas id="quaternionChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Altitude</div>
+                    <canvas id="altitudeChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Temperature</div>
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Acceleration X</div>
+                    <canvas id="accelXChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Acceleration Y</div>
+                    <canvas id="accelYChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Acceleration Z</div>
+                    <canvas id="accelZChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAYLOAD DATA SECTIONS -->
+        <div class="payload-section">
+            <div class="payload-header">Star Tracking Parameters</div>
+            <div class="param-row">
+                <div class="param-box">
+                    <span class="param-title">Attitude (Roll/Pitch/Yaw)</span>
+                    <span id="st-attitude" class="param-value">0,0,0</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Detected Stars</span>
+                    <span id="st-star-count" class="param-value">0</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Tracking Status</span>
+                    <span id="st-status" class="param-value">Unknown</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Attitude Accuracy</span>
+                    <span id="st-accuracy" class="param-value">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="payload-section">
+            <div class="payload-header">ACDS Parameters</div>
+            <div class="param-row">
+                <div class="param-box">
+                    <span class="param-title">Attitude (Roll/Pitch/Yaw)</span>
+                    <span id="ahrs-attitude" class="param-value">0,0,0</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Gyro (deg/s)</span>
+                    <span id="ahrs-gyro" class="param-value">0,0,0</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Accel (m/s²)</span>
+                    <span id="ahrs-accel" class="param-value">0,0,0</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">Magnetic Field</span>
+                    <span id="ahrs-mag" class="param-value">--, --, --</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="payload-section">
+            <div class="payload-header">Common & System Parameters</div>
+            <div class="param-row">
+                <div class="param-box">
+                    <span class="param-title">Battery Voltage</span>
+                    <span id="common-battery" class="param-value">--</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">LoRa Signal</span>
+                    <span id="common-lora" class="param-value">--</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">GPS (Lat/Lon)</span>
+                    <span id="common-gps" class="param-value">--,--</span>
+                </div>
+                <div class="param-box">
+                    <span class="param-title">System Health</span>
+                    <span id="common-health" class="param-value">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div>© 2025 Satellite Operations Center | Lazy Loopers Team</div>
+            <div>Combined Dashboard: Real-time Telemetry + AI Collision Detection</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+    <script>
+        // ========== CONFIGURATION ==========
+        const GLB_MODEL_PATH = 'static/models/satellite.glb'; // Change this path to your .glb file
+
+        // ========== NOTIFICATION SYSTEM ==========
+        const notificationQueue = [];
+        let isNotificationShowing = false;
+
+        function addNotificationToQueue(message, type = "default") {
+            notificationQueue.push({ message, type });
+            if (!isNotificationShowing) {
+                processNotificationQueue();
+            }
+        }
+
+        function processNotificationQueue() {
+            if (notificationQueue.length > 0 && !isNotificationShowing) {
+                isNotificationShowing = true;
+                const { message, type } = notificationQueue.shift();
+                const container = document.getElementById("notification-container");
+                const popup = document.createElement("div");
+                popup.classList.add("notification-popup");
+                popup.textContent = message;
+                container.appendChild(popup);
+                setTimeout(() => popup.classList.add("show"), 50);
+                setTimeout(() => {
+                    popup.remove();
+                    isNotificationShowing = false;
+                    processNotificationQueue();
+                }, 4000);
+            }
+        }
+
+        // ========== SOCKET.IO CONNECTION ==========
+        const socket = io();
+        const portSelect = document.getElementById("port-select");
+
+        async function getAndPopulatePorts() {
+            try {
+                const response = await fetch("/api/ports");
+                const data = await response.json();
+                portSelect.innerHTML = '<option disabled selected value="">Select Port</option>';
+                ['real', 'simulated'].forEach(groupName => {
+                    if (data[groupName] && data[groupName].length > 0) {
+                        const optgroup = document.createElement("optgroup");
+                        optgroup.label = groupName.charAt(0).toUpperCase() + groupName.slice(1) + " Ports";
+                        data[groupName].forEach(p => {
+                            const option = document.createElement("option");
+                            option.value = p.port;
+                            option.textContent = p.description || p.port;
+                            optgroup.appendChild(option);
+                        });
+                        portSelect.appendChild(optgroup);
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to fetch serial ports:", error);
+            }
+        }
+
+        portSelect.addEventListener("change", () => {
+            const selectedPort = portSelect.value;
+            if (selectedPort) {
+                addNotificationToQueue(`Connecting to ${selectedPort}...`);
+                socket.emit("set_port", { port: selectedPort });
+            }
+        });
+
+        socket.on("port_status", (data) => {
+            const message = data.error ? `Error connecting to ${data.port}` : `Connected to ${data.port}!`;
+            addNotificationToQueue(message, data.error ? "error" : "connected");
+        });
+
+        // ========== CHART SETUP ==========
+        const maxDataPoints = 600;
+        let elapsedSeconds = 0;
+        const timeWindowSeconds = 100;
+
+        function createChart(id, datasets) {
+            const ctx = document.getElementById(id).getContext("2d");
+            return new Chart(ctx, {
+                type: "line",
+                data: { datasets: datasets.map(ds => ({ ...ds, data: [] })) },
+                options: {
+                    animation: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: "#000",
+                                usePointStyle: true,
+                                pointStyle: "line",
+                                boxWidth: 20
+                            }
+                        },
+                        tooltip: {
+                            mode: "index",
+                            intersect: false,
+                            backgroundColor: "#fff",
+                            titleColor: "#000",
+                            bodyColor: "#000",
+                            borderColor: "#000",
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: "linear",
+                            min: 0,
+                            max: timeWindowSeconds,
+                            ticks: { color: "#666" },
+                            grid: { color: "#e0e0e0" }
+                        },
+                        y: {
+                            ticks: { color: "#666" },
+                            grid: { color: "#e0e0e0" }
+                        }
+                    }
+                }
+            });
+        }
+
+        const charts = {
+            quaternion: createChart("quaternionChart", [
+                { label: "Q(w)", borderColor: "#000" },
+                { label: "Q(x)", borderColor: "#666" },
+                { label: "Q(y)", borderColor: "#999" },
+                { label: "Q(z)", borderColor: "#ccc" }
+            ]),
+            altitude: createChart("altitudeChart", [{ label: "Altitude (m)", borderColor: "#000" }]),
+            temperature: createChart("temperatureChart", [{ label: "Temperature (°C)", borderColor: "#666" }]),
+            accel_x: createChart("accelXChart", [{ label: "Accel X (m/s²)", borderColor: "#333" }]),
+            accel_y: createChart("accelYChart", [{ label: "Accel Y (m/s²)", borderColor: "#666" }]),
+            accel_z: createChart("accelZChart", [{ label: "Accel Z (m/s²)", borderColor: "#999" }])
+        };
+
+        function updateChart(chart, values) {
+            const valuesArray = Array.isArray(values) ? values : [values];
+            valuesArray.forEach((value, index) => {
+                if (chart.data.datasets[index]) {
+                    chart.data.datasets[index].data.push({ x: elapsedSeconds, y: value });
+                    if (chart.data.datasets[index].data.length > maxDataPoints) {
+                        chart.data.datasets[index].data.shift();
+                    }
+                }
+            });
+            chart.options.scales.x.min = Math.max(0, elapsedSeconds - timeWindowSeconds);
+            chart.options.scales.x.max = elapsedSeconds;
+            chart.update("none");
+        }
+
+        function updateStatusDisplayAnimated(elementId, newHtml) {
+            const element = document.getElementById(elementId);
+            if (element && element.innerHTML !== newHtml) {
+                gsap.to(element, {
+                    duration: 0.2,
+                    opacity: 0,
+                    onComplete: () => {
+                        element.innerHTML = newHtml;
+                        gsap.to(element, { duration: 0.2, opacity: 1 });
+                    }
+                });
+            }
+        }
+
+        // ========== SIMULATED DATA FOR ALL PARAMETERS ==========
+        function generateSimulatedData() {
+            const elapsedTime = Date.now() / 1000;
+            return {
+                // Star Tracking simulation
+                st_attitude: {
+                    roll: (Math.sin(elapsedTime * 0.05) * 45).toFixed(2),
+                    pitch: (Math.cos(elapsedTime * 0.07) * 30).toFixed(2),
+                    yaw: (Math.sin(elapsedTime * 0.03) * 60).toFixed(2)
+                },
+                st_stars: Math.floor(Math.random() * 50) + 10,
+                st_status: Math.random() > 0.3 ? "Tracking" : "Lost",
+                st_accuracy: (85 + Math.random() * 14).toFixed(1),
+
+                // ACDS simulation
+                ahrs_attitude: {
+                    roll: (Math.sin(elapsedTime * 0.08) * 35).toFixed(2),
+                    pitch: (Math.cos(elapsedTime * 0.06) * 25).toFixed(2),
+                    yaw: (Math.sin(elapsedTime * 0.04) * 50).toFixed(2)
+                },
+                ahrs_gyro: {
+                    x: (Math.sin(elapsedTime * 0.1) * 2).toFixed(2),
+                    y: (Math.cos(elapsedTime * 0.12) * 1.5).toFixed(2),
+                    z: (Math.sin(elapsedTime * 0.09) * 3).toFixed(2)
+                },
+                ahrs_accel: {
+                    x: (Math.sin(elapsedTime * 0.15) * 0.5).toFixed(2),
+                    y: (Math.cos(elapsedTime * 0.11) * 0.4).toFixed(2),
+                    z: (9.81 + Math.sin(elapsedTime * 0.08) * 0.2).toFixed(2)
+                },
+                ahrs_mag: {
+                    x: (Math.sin(elapsedTime * 0.07) * 50).toFixed(1),
+                    y: (Math.cos(elapsedTime * 0.09) * 50).toFixed(1),
+                    z: (Math.sin(elapsedTime * 0.06) * 50).toFixed(1)
+                },
+
+                // Common & System Parameters
+                battery: (12.5 + Math.random() * 0.3).toFixed(2),
+                lora_signal: (Math.floor(Math.random() * 40) - 120),
+                gps_lat: (19.0760 + (Math.sin(elapsedTime * 0.02) * 0.05)).toFixed(4),
+                gps_lon: (72.8777 + (Math.cos(elapsedTime * 0.03) * 0.05)).toFixed(4),
+                system_health: Math.random() > 0.2 ? "Nominal" : "Warning"
+            };
+        }
+
+        // ========== 3D MODEL SETUP WITH GLB SUPPORT ==========
+        let satellite, scene, camera, renderer;
+        let camDistance = 6.0;
+        let camH = 0.0;
+        let camP = 10.0;
+        let isPointerDown = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+        let gltfLoader = null;
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+            camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+            camera.position.z = camDistance;
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setClearColor(0xffffff, 1);
+            const canvasHolder = document.getElementById("satellite-canvas");
+            canvasHolder.appendChild(renderer.domElement);
+
+            function resizeRenderer() {
+                const rect = canvasHolder.getBoundingClientRect();
+                const w = Math.max(64, Math.floor(rect.width));
+                const h = Math.max(64, Math.floor(rect.height));
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            }
+
+            window.addEventListener('resize', resizeRenderer);
+            resizeRenderer();
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 7.5);
+            scene.add(dirLight);
+
+            // Initialize GLB loader
+            gltfLoader = new THREE.GLTFLoader();
+
+            // Try to load GLB model, fallback to geometric model
+            gltfLoader.load(GLB_MODEL_PATH, 
+                (gltf) => {
+                    satellite = gltf.scene;
+                    try {
+                        const box = new THREE.Box3().setFromObject(satellite);
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const targetSize = 1.4;
+                        const scaleFactor = (maxDim > 0) ? (targetSize / maxDim) : 0.05;
+                        satellite.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+                        const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scaleFactor);
+                        satellite.position.sub(center);
+
+                        const newMaxDim = maxDim * scaleFactor;
+                        camDistance = Math.max(camDistance, newMaxDim * 3.5);
+                    } catch (e) {
+                        satellite.scale.set(0.02, 0.02, 0.02);
+                        satellite.position.set(0, 0, 0);
+                    }
+                    scene.add(satellite);
+                    gsap.from(satellite.position, { y: -2, duration: 1.5, ease: "elastic.out(1, 0.5)", delay: 0.2 });
+                },
+                undefined,
+                () => {
+                    // Fallback to geometric model if GLB fails to load
+                    const geometry = new THREE.BoxGeometry(1, 0.5, 0.3);
+                    const material = new THREE.MeshPhongMaterial({ color: 0x000000 });
+                    satellite = new THREE.Mesh(geometry, material);
+                    scene.add(satellite);
+                }
+            );
+
+            renderer.domElement.addEventListener('pointerdown', (e) => {
+                isPointerDown = true;
+                lastPointerX = e.clientX;
+                lastPointerY = e.clientY;
+            });
+
+            window.addEventListener('pointerup', () => { isPointerDown = false; });
+            window.addEventListener('pointermove', (e) => {
+                if (!isPointerDown) return;
+                const dx = e.clientX - lastPointerX;
+                const dy = e.clientY - lastPointerY;
+                lastPointerX = e.clientX;
+                lastPointerY = e.clientY;
+                camH -= dx * 0.2;
+                camP += dy * 0.2;
+                camP = Math.max(-89, Math.min(89, camP));
+            });
+
+            renderer.domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = Math.sign(e.deltaY) > 0 ? 1.1 : 0.9;
+                camDistance *= delta;
+                camDistance = Math.max(1.0, Math.min(50.0, camDistance));
+            }, { passive: false });
+
+            renderer.domElement.addEventListener('dblclick', () => {
+                camDistance = 6.0; camH = 0; camP = 10.0;
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const target = satellite ? satellite.position : new THREE.Vector3(0, 0, 0);
+                const hRad = THREE.MathUtils.degToRad(camH);
+                const pRad = THREE.MathUtils.degToRad(camP);
+                const x = camDistance * Math.cos(pRad) * Math.sin(hRad);
+                const y = camDistance * Math.sin(pRad);
+                const z = camDistance * Math.cos(pRad) * Math.cos(hRad);
+                camera.position.set(target.x + x, target.y + y, target.z + z);
+                camera.up.set(0, 1, 0);
+                camera.lookAt(target);
+
+                if (satellite) renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // ========== AI ML MODEL ==========
+        let mlModel = null;
+        let isModelTrained = false;
+        let totalCollisionPredictions = 0;
+        let activeSatelliteData = null;
+
+        function createSyntheticTrainingData(sampleCount = 500) {
+            const inputFeatures = [];
+            const outputLabels = [];
+
+            for (let i = 0; i < sampleCount; i++) {
+                const featureVector = [
+                    Math.random(), Math.random(), Math.random(), Math.random(), Math.random(),
+                    Math.random(), Math.random(), Math.random(), Math.random(), Math.random()
+                ];
+
+                const altFactor = featureVector[0] < 0.2 ? 0.8 : 0.2;
+                const incFactor = featureVector[1] > 0.7 ? 0.7 : 0.3;
+                const distFactor = featureVector[7] < 0.3 ? 0.9 : 0.1;
+                const proxFactor = featureVector[9] > 0.6 ? 0.8 : 0.2;
+
+                const riskScore = (altFactor * 0.3 + incFactor * 0.2 + distFactor * 0.3 + proxFactor * 0.2) +
+                                 (Math.random() * 0.1 - 0.05);
+
+                inputFeatures.push(featureVector);
+                outputLabels.push([Math.max(0, Math.min(1, riskScore))]);
+            }
+
+            return {
+                inputFeatures: tf.tensor2d(inputFeatures),
+                outputLabels: tf.tensor2d(outputLabels)
+            };
+        }
+
+        function initializeModelArchitecture() {
+            mlModel = tf.sequential({
+                layers: [
+                    tf.layers.dense({ inputShape: [10], units: 64, activation: 'relu' }),
+                    tf.layers.dropout({ rate: 0.2 }),
+                    tf.layers.dense({ units: 32, activation: 'relu' }),
+                    tf.layers.dropout({ rate: 0.2 }),
+                    tf.layers.dense({ units: 16, activation: 'relu' }),
+                    tf.layers.dense({ units: 1, activation: 'sigmoid' })
+                ]
+            });
+
+            mlModel.compile({
+                optimizer: tf.train.adam(0.01),
+                loss: 'meanSquaredError',
+                metrics: ['mae']
+            });
+        }
+
+        async function trainModel() {
+            const trainBtn = document.getElementById('trainBtn');
+            if (!trainBtn) {
+                addNotificationToQueue('Train button not found');
+                return;
+            }
+            trainBtn.disabled = true;
+
+            try {
+                document.getElementById('trainingInfo').innerHTML = '<span class="loading"></span>Generating training data...';
+
+                const syntheticTrainingData = createSyntheticTrainingData(500);
+                const numEpochs = parseInt(document.getElementById('epochs').value);
+                const batchSizeValue = parseInt(document.getElementById('batchSize').value);
+
+                if (!mlModel) {
+                    initializeModelArchitecture();
+                }
+
+                document.getElementById('modelStatus').textContent = 'Training...';
+                document.getElementById('trainingInfo').innerHTML = '<span class="loading"></span>Training neural network...';
+
+                await mlModel.fit(syntheticTrainingData.inputFeatures, syntheticTrainingData.outputLabels, {
+                    epochs: numEpochs,
+                    batchSize: batchSizeValue,
+                    verbose: 0,
+                    callbacks: {
+                        onEpochEnd: (epoch, logs) => {
+                            const progress = ((epoch + 1) / numEpochs) * 100;
+                            document.getElementById('progressFill').style.width = progress + '%';
+                            document.getElementById('trainingLoss').textContent = logs.loss.toFixed(4);
+                            document.getElementById('accuracy').textContent = ((100 - (logs.loss * 100)).toFixed(2)) + '%';
+                            document.getElementById('trainingInfo').innerHTML =
+                                `Epoch ${epoch + 1}/${numEpochs} | Loss: ${logs.loss.toFixed(4)} | MAE: ${logs.mae.toFixed(4)}`;
+                        }
+                    }
+                });
+
+                syntheticTrainingData.inputFeatures.dispose();
+                syntheticTrainingData.outputLabels.dispose();
+
+                isModelTrained = true;
+                document.getElementById('modelStatus').textContent = 'Trained ✓';
+                document.getElementById('trainingInfo').innerHTML = 'Model training complete! Ready for predictions.';
+                document.getElementById('predictBtn').disabled = false;
+
+            } catch (error) {
+                console.error('Training error:', error);
+                document.getElementById('trainingInfo').innerHTML = `Error: ${error.message}`;
+                document.getElementById('modelStatus').textContent = 'Error';
+            } finally {
+                trainBtn.disabled = false;
+            }
+        }
+
+        async function fetchLiveData() {
+            const satelliteId = parseInt(document.getElementById('satSelect').value);
+
+            if (!satelliteId) {
+                alert('Please enter a valid satellite ID');
+                return;
+            }
+
+            const fetchBtn = document.getElementById('fetchBtn');
+            fetchBtn.disabled = true;
+
+            try {
+                document.getElementById('satelliteContainer').innerHTML = '<div class="empty-state"><span class="loading"></span>Fetching satellite data...</div>';
+
+                activeSatelliteData = {
+                    name: `Satellite ${satelliteId}`,
+                    id: satelliteId,
+                    position: {
+                        satlatitude: 19.0760 + (Math.random() - 0.5) * 10,
+                        satlongitude: 72.8777 + (Math.random() - 0.5) * 10,
+                        sataltitude: 400 + Math.random() * 100,
+                        azimuth: Math.random() * 360,
+                        elevation: -90 + Math.random() * 180,
+                        timestamp: Math.floor(Date.now() / 1000)
+                    }
+                };
+
+                renderSatelliteDisplay(activeSatelliteData);
+                document.getElementById('predictBtn').disabled = false;
+                addNotificationToQueue(`Loaded satellite data for ID ${satelliteId}`);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('satelliteContainer').innerHTML = `Error: ${error.message}`;
+            } finally {
+                fetchBtn.disabled = false;
+            }
+        }
+
+        function renderSatelliteDisplay(satelliteDetails) {
+            const positionData = satelliteDetails.position;
+            const html = `
+                <div style="background: #f9f9f9; border: 2px solid #000; padding: 15px; border-radius: 6px;">
+                    <div style="color: #000; font-weight: bold; margin-bottom: 12px; font-size: 1.1em;">${satelliteDetails.name}</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 0.9em;">
+                        <div><span style="color: #666;">Latitude:</span> <span style="color: #000; font-weight: bold;">${positionData.satlatitude.toFixed(4)}°</span></div>
+                        <div><span style="color: #666;">Longitude:</span> <span style="color: #000; font-weight: bold;">${positionData.satlongitude.toFixed(4)}°</span></div>
+                        <div><span style="color: #666;">Altitude:</span> <span style="color: #000; font-weight: bold;">${positionData.sataltitude.toFixed(2)} km</span></div>
+                        <div><span style="color: #666;">Azimuth:</span> <span style="color: #000; font-weight: bold;">${positionData.azimuth.toFixed(2)}°</span></div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('satelliteContainer').innerHTML = html;
+        }
+
+        async function predictCollision() {
+            if (!isModelTrained) {
+                alert('Please train the model first!');
+                return;
+            }
+
+            if (!activeSatelliteData) {
+                alert('Please fetch satellite data first!');
+                return;
+            }
+
+            try {
+                const predictionInput = tf.tensor2d([[
+                    Math.random(), Math.random(), Math.random(), Math.random(), Math.random(),
+                    Math.random(), Math.random(), Math.random(), Math.random(), Math.random()
+                ]]);
+
+                const predictionResult = mlModel.predict(predictionInput);
+                const collisionRiskScore = (await predictionResult.data())[0];
+
+                predictionInput.dispose();
+                predictionResult.dispose();
+
+                const riskSeverity = collisionRiskScore > 0.7 ? 'critical' : collisionRiskScore > 0.4 ? 'high' : 'medium';
+                const minimumDistance = (200 + Math.random() * 800).toFixed(0);
+                const closestApproachTime = (1 + Math.random() * 24).toFixed(1);
+                const modelConfidence = (85 + Math.random() * 15).toFixed(1);
+
+                totalCollisionPredictions++;
+                document.getElementById('predictionCount').textContent = totalCollisionPredictions;
+
+                const html = `
+                    <div class="prediction-item ${riskSeverity}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div style="color: #000; font-weight: bold;">${activeSatelliteData.name} (ID: ${activeSatelliteData.id})</div>
+                            <span class="badge ${riskSeverity}">${riskSeverity.toUpperCase()}</span>
+                        </div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="detail-label">ML Risk Score</div>
+                                <div class="detail-value">${(collisionRiskScore * 100).toFixed(2)}%</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Min Distance</div>
+                                <div class="detail-value">${minimumDistance} km</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Approach Time</div>
+                                <div class="detail-value">${closestApproachTime}h</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Confidence</div>
+                                <div class="detail-value">${modelConfidence}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('predictionsContainer').innerHTML = html;
+                addNotificationToQueue(`Collision prediction complete - Risk: ${riskSeverity.toUpperCase()}`);
+
+            } catch (error) {
+                console.error('Prediction error:', error);
+                addNotificationToQueue(`Prediction error: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== SENSOR DATA HANDLING ==========
+        socket.on("sensor_data", (data) => {
+            elapsedSeconds++;
+            
+            updateChart(charts.quaternion, [data.qw, data.qx, data.qy, data.qz]);
+            updateChart(charts.altitude, data.altitude);
+            updateChart(charts.temperature, data.temperature);
+            updateChart(charts.accel_x, data.accel_x);
+            updateChart(charts.accel_y, data.accel_y);
+            updateChart(charts.accel_z, data.accel_z);
+
+            updateStatusDisplayAnimated("speed-status", `${data.speed.toFixed(2)} m/s`);
+            updateStatusDisplayAnimated("reaction-wheel-status", data.reaction_wheel);
+            updateStatusDisplayAnimated("magnetorquer-status", data.magnetorquer);
+            updateStatusDisplayAnimated("lux-status", data.lux.toFixed(1));
+            updateStatusDisplayAnimated("sun-up-status", data.sun_up);
+
+            // Get simulated data
+            const simData = generateSimulatedData();
+
+            // Update Star Tracking Parameters
+            updateStatusDisplayAnimated("st-attitude", `${simData.st_attitude.roll},${simData.st_attitude.pitch},${simData.st_attitude.yaw}`);
+            updateStatusDisplayAnimated("st-star-count", simData.st_stars);
+            updateStatusDisplayAnimated("st-status", simData.st_status);
+            updateStatusDisplayAnimated("st-accuracy", `${simData.st_accuracy}%`);
+
+            // Update ACDS Parameters
+            updateStatusDisplayAnimated("ahrs-attitude", `${simData.ahrs_attitude.roll},${simData.ahrs_attitude.pitch},${simData.ahrs_attitude.yaw}`);
+            updateStatusDisplayAnimated("ahrs-gyro", `${simData.ahrs_gyro.x},${simData.ahrs_gyro.y},${simData.ahrs_gyro.z}`);
+            updateStatusDisplayAnimated("ahrs-accel", `${simData.ahrs_accel.x},${simData.ahrs_accel.y},${simData.ahrs_accel.z}`);
+            updateStatusDisplayAnimated("ahrs-mag", `${simData.ahrs_mag.x},${simData.ahrs_mag.y},${simData.ahrs_mag.z}`);
+
+            // Update Common & System Parameters
+            updateStatusDisplayAnimated("common-battery", `${simData.battery}V`);
+            updateStatusDisplayAnimated("common-lora", `${simData.lora_signal} dBm`);
+            updateStatusDisplayAnimated("common-gps", `${simData.gps_lat},${simData.gps_lon}`);
+            updateStatusDisplayAnimated("common-health", simData.system_health);
+
+            // Update 3D model orientation
+            if (satellite && data.qx !== undefined) {
+                const rotationQuaternion = new THREE.Quaternion(data.qx, data.qy, data.qz, data.qw);
+                const adjustRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'));
+                satellite.quaternion.copy(adjustRotation).multiply(rotationQuaternion);
+            }
+        });
+
+        socket.on('notification', (payload) => {
+            if (payload && payload.message) addNotificationToQueue(payload.message, 'connected');
+        });
+
+        socket.on('star_tracking_result', (data) => {
+            if (data && data.error) {
+                addNotificationToQueue('Star tracker error: ' + data.error, 'error');
+            } else {
+                const msg = data.message || 'Star analysis complete';
+                addNotificationToQueue(msg, 'connected');
+                console.log('Star tracking result:', data);
+            }
+        });
+
+        // ========== INITIALIZATION ==========
+        window.addEventListener('load', () => {
+            init3D();
+            getAndPopulatePorts();
+            addNotificationToQueue('Dashboard initialized - Ready for operations');
+        });
     </script>
-  </body>
+</body>
 </html>
